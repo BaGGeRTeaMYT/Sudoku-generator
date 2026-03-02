@@ -1,5 +1,6 @@
 import pygame
 import sys
+import asyncio
 from sudoku_generator import SudokuGenerator
 
 # Initialize Pygame
@@ -18,6 +19,7 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (200, 200, 200)
 DARK_GRAY = (100, 100, 100)
+DARK_BLUE = (0, 0, 150)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
@@ -39,6 +41,7 @@ class SudokuGUI:
         self.pencil_marks = [[set() for _ in range(9)] for _ in range(9)]
         self.error_cells = set()
         self.highlighted_cells = set()
+        self.highlighted_number = 0
         self.shift_pressed = False
         self.solved = False
         self.pencil_mode = False
@@ -59,11 +62,11 @@ class SudokuGUI:
         self.highlighted_cells = set()
         if self.shift_pressed and self.selected:
             row, col = self.selected
-            val = self.user_board[row][col]
-            if val != 0:
+            self.highlighted_number = self.user_board[row][col]
+            if self.highlighted_number != 0:
                 for r in range(9):
                     for c in range(9):
-                        if self.user_board[r][c] == val:
+                        if self.user_board[r][c] == self.highlighted_number:
                             self.highlighted_cells.add((r, c))
 
     def draw_grid(self):
@@ -87,7 +90,7 @@ class SudokuGUI:
                 # Draw value or pencil marks
                 val = self.user_board[i][j]
                 if val != 0:
-                    color = BLACK if self.original_board[i][j] != 0 else BLUE
+                    color = BLACK if self.original_board[i][j] != 0 else DARK_BLUE
                     if self.solved and self.original_board[i][j] == 0:
                         color = GREEN
                         
@@ -105,7 +108,11 @@ class SudokuGUI:
                             mark_x = x + c * sub_cell_size + sub_cell_size // 2
                             mark_y = y + r * sub_cell_size + sub_cell_size // 2
                             
-                            text = self.small_font.render(str(mark), True, DARK_GRAY)
+                            text = self.small_font.render(
+                                str(mark),
+                                True,
+                                BLUE if self.shift_pressed and mark == self.highlighted_number else DARK_GRAY
+                            )
                             text_rect = text.get_rect(center=(mark_x, mark_y))
                             self.screen.blit(text, text_rect)
 
@@ -148,10 +155,13 @@ class SudokuGUI:
             text_rect = text_surf.get_rect(center=rect.center)
             self.screen.blit(text_surf, text_rect)
 
-        # Draw mode indicator
+        # Draw mode indicator under Check button
+        check_button_rect = self.button_rects[1][0]  # Check is the second button (index 1)
         mode_text = "Mode: Pencil" if self.pencil_mode else "Mode: Normal"
         mode_surf = self.small_font.render(mode_text, True, BLACK)
-        self.screen.blit(mode_surf, (10, 10))
+        mode_x = check_button_rect.centerx - mode_surf.get_width() // 2
+        mode_y = check_button_rect.bottom + 10
+        self.screen.blit(mode_surf, (mode_x, mode_y))
 
     def check_solution(self):
         self.error_cells = set()
@@ -264,7 +274,7 @@ class SudokuGUI:
         elif key == pygame.K_UP or key == pygame.K_w:
             self.move_selection((-1, 0))
 
-    def run(self):
+    async def run(self):
         running = True
         while running:
             for event in pygame.event.get():
@@ -287,10 +297,11 @@ class SudokuGUI:
             self.draw_grid()
             self.draw_buttons()
             pygame.display.flip()
+            await asyncio.sleep(0)
 
         pygame.quit()
         sys.exit()
 
 if __name__ == "__main__":
     app = SudokuGUI()
-    app.run()
+    asyncio.run(app.run())
