@@ -22,6 +22,7 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 LIGHT_BLUE = (200, 200, 255)
 LIGHT_RED = (255, 200, 200)
+LIGHT_GREEN = (200, 255, 200)
 
 class SudokuGUI:
     def __init__(self):
@@ -72,10 +73,10 @@ class SudokuGUI:
                 color = WHITE
                 if (i, j) in self.error_cells:
                     color = LIGHT_RED
+                elif (i, j) in self.highlighted_cells:
+                    color = GRAY
                 elif self.selected == (i, j):
                     color = LIGHT_BLUE
-                elif (i, j) in self.highlighted_cells:
-                    color = (200, 255, 200) # Light green for highlighted
                 
                 pygame.draw.rect(self.screen, color, (x, y, CELL_SIZE, CELL_SIZE))
                 
@@ -188,9 +189,13 @@ class SudokuGUI:
                 if pygame.K_1 <= key <= pygame.K_9:
                     self.user_board[row][col] = key - pygame.K_0
                     self.update_highlights()
+                    if not any(0 in row for row in self.user_board):
+                        self.check_solution()
                 elif pygame.K_KP1 <= key <= pygame.K_KP9:
                     self.user_board[row][col] = key - pygame.K_KP0
                     self.update_highlights()
+                    if not any(0 in row for row in self.user_board):
+                        self.check_solution()
                 elif key == pygame.K_BACKSPACE or key == pygame.K_DELETE:
                     self.user_board[row][col] = 0
                     self.update_highlights()
