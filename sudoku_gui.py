@@ -17,6 +17,7 @@ TOP_MARGIN = 20
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (200, 200, 200)
+DARK_GRAY = (100, 100, 100)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
@@ -29,16 +30,18 @@ class SudokuGUI:
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         pygame.display.set_caption("Sudoku Generator")
         self.font = pygame.font.SysFont('Arial', 36)
-        self.small_font = pygame.font.SysFont('Arial', 24)
+        self.small_font = pygame.font.SysFont('Arial', 20)
         
         self.generator = SudokuGenerator()
         self.selected = None
         self.user_board = [[0 for _ in range(9)] for _ in range(9)]
         self.original_board = [[0 for _ in range(9)] for _ in range(9)]
+        self.pencil_marks = [[set() for _ in range(9)] for _ in range(9)]
         self.error_cells = set()
         self.highlighted_cells = set()
         self.shift_pressed = False
         self.solved = False
+        self.pencil_mode = False
         
         self.new_game()
 
@@ -46,6 +49,7 @@ class SudokuGUI:
         puzzle = self.generator.generate_puzzle()
         self.original_board = [row[:] for row in puzzle]
         self.user_board = [row[:] for row in puzzle]
+        self.pencil_marks = [[set() for _ in range(9)] for _ in range(9)]
         self.error_cells = set()
         self.highlighted_cells = set()
         self.solved = False
@@ -80,7 +84,7 @@ class SudokuGUI:
                 
                 pygame.draw.rect(self.screen, color, (x, y, CELL_SIZE, CELL_SIZE))
                 
-                # Draw value
+                # Draw value or pencil marks
                 val = self.user_board[i][j]
                 if val != 0:
                     color = BLACK if self.original_board[i][j] != 0 else BLUE
@@ -90,6 +94,20 @@ class SudokuGUI:
                     text = self.font.render(str(val), True, color)
                     text_rect = text.get_rect(center=(x + CELL_SIZE // 2, y + CELL_SIZE // 2))
                     self.screen.blit(text, text_rect)
+                else:
+                    # Draw pencil marks
+                    marks = self.pencil_marks[i][j]
+                    if marks:
+                        sub_cell_size = CELL_SIZE // 3
+                        for mark in marks:
+                            r = (mark - 1) // 3
+                            c = (mark - 1) % 3
+                            mark_x = x + c * sub_cell_size + sub_cell_size // 2
+                            mark_y = y + r * sub_cell_size + sub_cell_size // 2
+                            
+                            text = self.small_font.render(str(mark), True, DARK_GRAY)
+                            text_rect = text.get_rect(center=(mark_x, mark_y))
+                            self.screen.blit(text, text_rect)
 
         # Draw lines
         for i in range(10):
@@ -129,6 +147,11 @@ class SudokuGUI:
             text_surf = self.small_font.render(text, True, BLACK)
             text_rect = text_surf.get_rect(center=rect.center)
             self.screen.blit(text_surf, text_rect)
+
+        # Draw mode indicator
+        mode_text = "Mode: Pencil" if self.pencil_mode else "Mode: Normal"
+        mode_surf = self.small_font.render(mode_text, True, BLACK)
+        self.screen.blit(mode_surf, (10, 10))
 
     def check_solution(self):
         self.error_cells = set()
@@ -183,24 +206,54 @@ class SudokuGUI:
             self.set_selection( (self.selected[0] + dir[0], self.selected[1] + dir[1]) )
 
     def handle_key(self, key):
+        if key == pygame.K_SPACE:
+            self.pencil_mode = not self.pencil_mode
+            return
+
         if self.selected and not self.solved:
             row, col = self.selected
             if self.original_board[row][col] == 0:
+                num = 0
                 if pygame.K_1 <= key <= pygame.K_9:
-                    self.user_board[row][col] = key - pygame.K_0
-                    self.update_highlights()
-                    if not any(0 in row for row in self.user_board):
-                        self.check_solution()
+                    num = key - pygame.K_0
                 elif pygame.K_KP1 <= key <= pygame.K_KP9:
-                    self.user_board[row][col] = key - pygame.K_KP0
-                    self.update_highlights()
-                    if not any(0 in row for row in self.user_board):
-                        self.check_solution()
+                    num = key - pygame.K_KP0
+                
+                if num > 0:
+                    if self.pencil_mode:
+                        if num in self.pencil_marks[row][col]:
+                            self.pencil_marks[row][col].remove(num)
+                        else:
+                            self.pencil_marks[row][col].add(num)
+                    else:
+                        self.user_board[row][col] = num
+                        self.update_highlights()
+                        if not any(0 in row for row in self.user_board):
+                            self.check_solution()
+                
                 elif key == pygame.K_BACKSPACE or key == pygame.K_DELETE:
                     self.user_board[row][col] = 0
                     self.update_highlights()
             if key == pygame.K_ESCAPE:
                 self.selected = None
+            
+            if key == pygame.K_q:
+                row, col = self.selected
+                val = max(self.user_board[row][col], self.original_board[row][col])
+                if val > 0:
+                    # Remove from row and col
+                    for k in range(9):
+                        if val in self.pencil_marks[row][k]:
+                            self.pencil_marks[row][k].remove(val)
+                        if val in self.pencil_marks[k][col]:
+                            self.pencil_marks[k][col].remove(val)
+                    
+                    # Remove from 3x3 square
+                    start_row, start_col = 3 * (row // 3), 3 * (col // 3)
+                    for r in range(start_row, start_row + 3):
+                        for c in range(start_col, start_col + 3):
+                            if val in self.pencil_marks[r][c]:
+                                self.pencil_marks[r][c].remove(val)
 
         if key == pygame.K_RIGHT or key == pygame.K_d:
             self.move_selection((0, 1))
